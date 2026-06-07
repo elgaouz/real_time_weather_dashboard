@@ -1,0 +1,56 @@
+# ========== SETUP (once) ==========
+cd D:\etude\RealTime_weather_dashboard
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+
+cd D:\etude\RealTime_weather_dashboard\spark-app
+sbt clean assembly
+
+# ========== TERMINAL 1 – Docker (Kafka + Spark + Hive) ==========
+cd D:\etude\RealTime_weather_dashboard
+docker-compose down --remove-orphans
+docker-compose up -d kafka spark hive-metastore hive
+docker logs -f spark
+
+# ========== TERMINAL 2 – Kafka producer ==========
+cd D:\etude\RealTime_weather_dashboard
+.\.venv\Scripts\activate
+$env:OPENWEATHER_API_KEY = "your_openweather_api_key"
+python kafka_producer.py
+
+# ========== TERMINAL 3 – Dash dashboard ==========
+cd D:\etude\RealTime_weather_dashboard
+.\.venv\Scripts\activate
+python dash_app.py
+
+# Open in browser:
+# http://127.0.0.1:8050
+
+# Optional:
+# $env:DASH_REFRESH_MS = "10000"    # refresh every 10s (default)
+# $env:DASH_PORT = "8191"           # custom port
+
+# ========== Hive (optional – Beeline) ==========
+docker exec -it hive-server beeline -u jdbc:hive2://localhost:10000
+
+CREATE DATABASE IF NOT EXISTS weather_db;
+USE weather_db;
+DROP TABLE IF EXISTS weather_detail_ext;
+CREATE EXTERNAL TABLE weather_detail_ext (
+  CityName STRING,
+  Temperature DOUBLE,
+  Humidity INT,
+  CreationTime STRING,
+  CreationDate STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/output/weather_detail';
+SELECT COUNT(*) FROM weather_detail_ext;
+SELECT * FROM weather_detail_ext LIMIT 20;
+
+# ========== STOP ==========
+cd D:\etude\RealTime_weather_dashboard
+docker-compose down

@@ -1,0 +1,56 @@
+services:
+
+  kafka:
+    image: bitnamilegacy/kafka:4.0.0-debian-12-r10
+    ports:
+      - "9094:9094"
+    environment:
+      - KAFKA_ENABLE_KRAFT=true
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=INTERNAL://:9092,EXTERNAL://:9094,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:9092,EXTERNAL://localhost:9094
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+
+  spark:
+    image: bitnamilegacy/spark:3.5.0
+    container_name: spark
+    user: "0:0"
+    depends_on:
+      - kafka
+    volumes:
+      - ./spark-app:/app
+      - ./output:/output
+    working_dir: /app
+    command: >
+      bash -c "mkdir -p /output/weather_detail /output/weather_detail_checkpoint &&
+      chmod -R 777 /output &&
+      /opt/bitnami/spark/bin/spark-submit
+      --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0
+      --class WeatherStreaming
+      --master local[*]
+      /app/target/scala-2.12/weather-streaming-app-assembly-0.1.0.jar"
+
+  hive:
+    image: apache/hive:4.0.0
+    container_name: hive-server
+    ports:
+      - "10000:10000"
+    environment:
+      HIVE_METASTORE_URI: thrift://hive-metastore:9083
+      SERVICE_NAME: hiveserver2
+    volumes:
+      - ./output:/output
+    depends_on:
+      - hive-metastore
+
+  hive-metastore:
+    image: apache/hive:4.0.0
+    container_name: hive-metastore
+    ports:
+      - "9083:9083"
+    environment:
+      SERVICE_NAME: metastore
