@@ -169,3 +169,6 @@ docker-compose down
 | Kafka (host) | `localhost:9094` |
 | Hive Beeline | `jdbc:hive2://localhost:10000` |
 | All commands | See also `commands.txt` |
+
+## A screen to see how the app looks
+![Application Screenshot](app.png)
